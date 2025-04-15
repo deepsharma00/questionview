@@ -53,28 +53,33 @@ export default function CandidateDashboard() {
   }, [router]);
   
   const fetchTechStacks = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/questions/stacks', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setTechStacks(data.data);
-        if (data.data.length > 0) {
-          setSelectedStack(data.data[0]);
-        }
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch('/api/questions/techstacks', {
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-    } catch (error) {
-      console.error('Error fetching tech stacks:', error);
-    } finally {
-      setLoading(false);
+    });
+    if (!response.ok) {
+      setTechStacks([]);
+      return;
     }
-  };
+    const data = await response.json();
+    if (Array.isArray(data.techStacks)) {
+      setTechStacks(data.techStacks);
+      if (data.techStacks.length > 0) {
+        setSelectedStack(data.techStacks[0]);
+      }
+    } else {
+      setTechStacks([]);
+    }
+  } catch (error) {
+    console.error('Error fetching tech stacks:', error);
+    setTechStacks([]);
+  } finally {
+    setLoading(false);
+  }
+};
   
   const checkActiveInterview = async () => {
     try {

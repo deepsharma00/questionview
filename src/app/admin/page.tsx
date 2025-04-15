@@ -150,41 +150,49 @@ export default function AdminDashboard() {
 
 // Questions Panel Component
 function QuestionsPanel() {
-  const [techStack, setTechStack] = useState('');
+  const [showAddStack, setShowAddStack] = useState(false);
+  const [newStack, setNewStack] = useState('');
+  const [techStack, setTechStack] = useState(''); // For upload form
   const [questions, setQuestions] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' });
   const [questionsList, setQuestionsList] = useState<any[]>([]);
-  const [selectedStack, setSelectedStack] = useState('');
+  const [selectedStack, setSelectedStack] = useState(''); // For view/filter
   const [techStacks, setTechStacks] = useState<string[]>([]);
-  
+
   useEffect(() => {
     fetchTechStacks();
   }, []);
   
   const fetchTechStacks = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      const response = await fetch('/api/questions/stacks', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        setTechStacks(data.data);
-        if (data.data.length > 0) {
-          setSelectedStack(data.data[0]);
-          fetchQuestions(data.data[0]);
-        }
+  try {
+    const token = localStorage.getItem('token');
+    const response = await fetch('/api/questions/techstacks', {
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-    } catch (error) {
-      console.error('Error fetching tech stacks:', error);
+    });
+    if (!response.ok) {
+      setTechStacks([]);
+      return;
     }
-  };
+    const data = await response.json();
+    if (Array.isArray(data.techStacks)) {
+      setTechStacks(data.techStacks);
+      if (data.techStacks.length > 0) {
+        setSelectedStack(data.techStacks[0]);
+        setTechStack(data.techStacks[0]);
+        fetchQuestions(data.techStacks[0]);
+      }
+    } else {
+      setTechStacks([]);
+    }
+  } catch (error) {
+    console.error('Error fetching tech stacks:', error);
+    setTechStacks([]);
+  }
+};
   
   const fetchQuestions = async (stack: string) => {
     try {
@@ -197,8 +205,11 @@ function QuestionsPanel() {
         }
       });
       
+      if (!response.ok) {
+        setQuestionsList([]);
+        return;
+      }
       const data = await response.json();
-      
       if (data.success) {
         setQuestionsList(data.data);
       }
@@ -218,7 +229,7 @@ function QuestionsPanel() {
       const token = localStorage.getItem('token');
       
       const formData = new FormData();
-      formData.append('techStack', techStack);
+      formData.append('techStack', techStack || selectedStack);
       
       if (questions) {
         formData.append('questions', questions);
@@ -293,15 +304,63 @@ function QuestionsPanel() {
           <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="techStack">
             Tech Stack
           </label>
-          <input
-            id="techStack"
-            type="text"
-            value={techStack}
-            onChange={(e) => setTechStack(e.target.value)}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-            placeholder="e.g., React, Node.js, Python"
-            required
-          />
+          <div className="flex items-center space-x-2">
+            <select
+              id="techStack"
+              value={techStack}
+              onChange={e => setTechStack(e.target.value)}
+              className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
+              required
+            >
+              <option value="" disabled>Select tech stack</option>
+              {techStacks.map(stack => (
+                <option key={stack} value={stack}>{stack}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowAddStack(true)}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded"
+            >
+              Add Tech Stack
+            </button>
+          </div>
+
+          {showAddStack && (
+            <div className="flex items-center space-x-2 mt-2">
+              <input
+                type="text"
+                value={newStack}
+                onChange={e => setNewStack(e.target.value)}
+                placeholder="New tech stack name"
+                className="border rounded px-2 py-1"
+              />
+              <button
+                type="button"
+                className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded"
+                onClick={() => {
+                  if (newStack && !techStacks.includes(newStack)) {
+                    setTechStacks([...techStacks, newStack]);
+                    setTechStack(newStack);
+                  }
+                  setNewStack('');
+                  setShowAddStack(false);
+                }}
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                className="bg-gray-300 hover:bg-gray-400 text-gray-700 px-2 py-1 rounded"
+                onClick={() => {
+                  setShowAddStack(false);
+                  setNewStack('');
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
         </div>
         
         <div className="mb-4">
@@ -348,23 +407,7 @@ function QuestionsPanel() {
       <div className="mt-8">
         <h3 className="text-lg font-semibold mb-4">View Questions</h3>
         
-        <div className="mb-4">
-          <label className="block text-gray-700 text-sm font-bold mb-2" htmlFor="stackSelect">
-            Select Tech Stack
-          </label>
-          <select
-            id="stackSelect"
-            value={selectedStack}
-            onChange={handleStackChange}
-            className="shadow appearance-none border rounded w-full py-2 px-3 text-gray-700 leading-tight focus:outline-none focus:shadow-outline"
-          >
-            {techStacks.map((stack) => (
-              <option key={stack} value={stack}>
-                {stack}
-              </option>
-            ))}
-          </select>
-        </div>
+
         
         {loading ? (
           <p>Loading questions...</p>
@@ -427,9 +470,11 @@ function InterviewsPanel() {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+      if (!response.ok) {
+        setCandidates([]);
+        return;
+      }
       const data = await response.json();
-      
       if (data.success) {
         setCandidates(data.data);
         if (data.data.length > 0) {
@@ -444,19 +489,23 @@ function InterviewsPanel() {
   const fetchTechStacks = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch('/api/questions/stacks', {
+      const response = await fetch('/api/questions/techstacks', {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+      if (!response.ok) {
+        setTechStacks([]);
+        return;
+      }
       const data = await response.json();
-      
-      if (data.success) {
-        setTechStacks(data.data);
-        if (data.data.length > 0) {
-          setSelectedStack(data.data[0]);
+      if (Array.isArray(data.techStacks)) {
+        setTechStacks(data.techStacks);
+        if (data.techStacks.length > 0) {
+          setSelectedStack(data.techStacks[0]);
         }
+      } else {
+        setTechStacks([]);
       }
     } catch (error) {
       console.error('Error fetching tech stacks:', error);
